@@ -2,80 +2,233 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Halcyon program relevance scorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   :root {
-    --border: #ddd9cf; --border-strong: #b8b4a8; --text-primary: #1f1e1a; --text-secondary: #6b6a63;
-    --surface-1: #f4f2ec; --surface-2: #ffffff;
-    --score-good: #3b6d11; --score-good-bg: #eaf3de; --score-mid: #854f0b; --score-mid-bg: #faeeda;
-    --score-low: #a32d2d; --score-low-bg: #fcebeb; --hit: #eaf3de; --hit-text: #3b6d11; --miss: #f0eee6; --miss-text: #8c897e;
+    /* ---- Token system: grounded in climate/agriculture subject matter ---- */
+    --bg: #F2F6EC;              /* pale sage paper */
+    --surface: #FFFFFF;
+    --surface-sunk: #E9EFDF;
+    --ink: #15261C;             /* warm near-black, green undertone */
+    --ink-soft: #55654F;
+    --line: #D8E0C9;
+    --line-strong: #B7C6A2;
+
+    --leaf: #1E8F5F;            /* primary — growth */
+    --leaf-deep: #0F6844;
+    --leaf-tint: #DCF1E4;
+
+    --sun: #F2994A;             /* secondary — energy */
+    --sun-tint: #FCE9D4;
+
+    --sky: #2D8FC9;             /* tertiary — water/adaptation */
+    --sky-tint: #DCECF7;
+
+    --gold: #D6A417;            /* quaternary — for charts */
+    --gold-tint: #F7EBC7;
+
+    --rust: #C1440E;            /* quinary / low score */
+    --rust-tint: #F6DED1;
+
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
   }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; color: var(--text-primary); background: var(--surface-1); }
-  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
-  h2 { font-size: 16px; font-weight: 500; margin: 2rem 0 0.75rem; }
-  .sub { color: var(--text-secondary); font-size: 14px; margin-bottom: 1.5rem; }
-  label.field-label { display: block; font-size: 13px; font-weight: 500; margin: 1rem 0 4px; color: var(--text-secondary); }
-  .field-hint { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
-  input[type="text"] { width: 100%; padding: 10px 12px; border: 0.5px solid var(--border-strong); border-radius: 8px; font-size: 14px; font-family: inherit; background: var(--surface-2); color: var(--text-primary); }
-  textarea { width: 100%; min-height: 90px; padding: 12px; border: 0.5px solid var(--border-strong); border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; background: var(--surface-2); color: var(--text-primary); }
+  body {
+    font-family: 'Karla', -apple-system, BlinkMacSystemFont, sans-serif;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+    color: var(--ink);
+  }
+  h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 19px;
+    margin: 2.5rem 0 1rem;
+    color: var(--ink);
+  }
+  .sub { color: var(--ink-soft); font-size: 14.5px; margin-bottom: 1.5rem; max-width: 60ch; }
+  label.field-label { display: block; font-size: 13px; font-weight: 600; margin: 1.25rem 0 4px; color: var(--ink-soft); }
+  .field-hint { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  input[type="text"] {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: 14.5px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  input[type="text"]:focus, textarea:focus { outline: 2px solid var(--leaf); outline-offset: 1px; border-color: var(--leaf); }
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-size: 14.5px;
+    font-family: inherit;
+    resize: vertical;
+    background: var(--surface);
+    color: var(--ink);
+  }
   textarea#score-venture-text { min-height: 180px; }
-  button { margin-top: 14px; padding: 10px 18px; border: 0.5px solid var(--border-strong); border-radius: 8px; background: var(--surface-2); font-size: 14px; font-weight: 500; cursor: pointer; }
-  button:hover { background: var(--surface-1); }
+  button {
+    margin-top: 16px;
+    padding: 11px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--leaf);
+    color: #fff;
+    font-size: 14.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  button:hover { background: var(--leaf-deep); }
   button:disabled { opacity: 0.5; cursor: default; }
-  button.secondary { background: transparent; }
-  .error { color: #a32d2d; font-size: 13px; margin-top: 8px; }
-  .results { margin-top: 2rem; display: flex; flex-direction: column; gap: 12px; }
-  .card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; }
-  .placeholder { color: var(--text-secondary); font-size: 14px; }
-  .score-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .score-left { display: flex; align-items: baseline; gap: 10px; }
-  .score-number { font-size: 32px; font-weight: 500; }
-  .score-out-of { font-size: 14px; color: var(--text-secondary); }
-  .score-tag { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 6px; }
-  .score-tag.strong { background: var(--score-good-bg); color: var(--score-good); }
-  .score-tag.moderate { background: var(--score-mid-bg); color: var(--score-mid); }
-  .score-tag.weak { background: var(--score-low-bg); color: var(--score-low); }
-  .rationale { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
-  .breakdown-item { padding: 10px 0; border-top: 0.5px solid var(--border); }
+  button.secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1.5px solid var(--line-strong);
+  }
+  button.secondary:hover { background: var(--surface-sunk); }
+  button.danger { color: var(--rust); border-color: var(--rust); }
+  button.danger:hover { background: var(--rust-tint); }
+  .error { color: var(--rust); font-size: 13px; margin-top: 8px; font-weight: 500; }
+  .results { margin-top: 1.75rem; display: flex; flex-direction: column; gap: 12px; }
+  .card {
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+  }
+  .placeholder { color: var(--ink-soft); font-size: 14px; }
+
+  /* ---- Dashboard ---- */
+  .dashboard { margin: 1.5rem 0 2rem; }
+  .stat-row { display: flex; gap: 12px; margin-bottom: 1.25rem; }
+  .stat-tile {
+    flex: 1;
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 1.1rem 1.25rem;
+  }
+  .stat-tile.accent-leaf { background: var(--leaf-tint); border-color: var(--leaf); }
+  .stat-tile.accent-sun { background: var(--sun-tint); border-color: var(--sun); }
+  .stat-tile.accent-sky { background: var(--sky-tint); border-color: var(--sky); }
+  .stat-number { font-family: 'Fraunces', serif; font-size: 32px; font-weight: 600; line-height: 1; display: block; }
+  .stat-label { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; margin-top: 6px; }
+  .chart-card {
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem 1rem;
+  }
+  .chart-card-title { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 10px; }
+  .chart-wrap { height: 160px; }
+  .dashboard-empty {
+    background: var(--surface);
+    border: 1.5px dashed var(--line-strong);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  .score-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .score-left { display: flex; align-items: baseline; gap: 8px; }
+  .score-number { font-family: 'Fraunces', serif; font-size: 36px; font-weight: 600; }
+  .score-out-of { font-size: 14px; color: var(--ink-soft); }
+  .score-tag { font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
+  .score-tag.strong { background: var(--leaf-tint); color: var(--leaf-deep); }
+  .score-tag.moderate { background: var(--gold-tint); color: #8A6A0F; }
+  .score-tag.weak { background: var(--rust-tint); color: var(--rust); }
+  .rationale { font-size: 14px; line-height: 1.6; color: var(--ink); }
+  .breakdown-item { padding: 12px 0; border-top: 1.5px solid var(--line); }
   .breakdown-item:first-child { border-top: none; }
-  .breakdown-title { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
-  .subsector-block { margin-bottom: 10px; }
+  .breakdown-title { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 8px; }
+  .subsector-block { margin-bottom: 12px; }
   .subsector-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .term-chip { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 5px; margin: 0 4px 4px 0; }
-  .term-chip.hit { background: var(--hit); color: var(--hit-text); }
-  .term-chip.miss { background: var(--miss); color: var(--miss-text); text-decoration: line-through; }
-  .term-chip.name-hit { background: var(--score-good-bg); color: var(--score-good); font-weight: 500; }
-  .term-chip.name-miss { background: var(--miss); color: var(--miss-text); font-weight: 500; }
-  .compare-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
-  .compare-left { display: flex; align-items: center; gap: 12px; }
-  .compare-score { font-size: 16px; font-weight: 500; min-width: 32px; }
-  .compare-name { font-size: 14px; }
-  .compare-summary { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-  .compare-delete { margin-top: 0; padding: 4px 10px; font-size: 12px; border-radius: 6px; }
-  .empty-note { font-size: 13px; color: var(--text-secondary); }
+  .term-chip { display: inline-block; font-size: 12.5px; padding: 3px 10px; border-radius: 999px; margin: 0 5px 5px 0; font-weight: 500; }
+  .term-chip.hit { background: var(--leaf-tint); color: var(--leaf-deep); }
+  .term-chip.miss { background: var(--surface-sunk); color: var(--ink-soft); text-decoration: line-through; }
+  .term-chip.name-hit { background: var(--leaf); color: #fff; font-weight: 700; }
+  .term-chip.name-miss { background: var(--surface-sunk); color: var(--ink-soft); font-weight: 700; }
+
+  .compare-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius-md);
+    padding: 12px 16px; margin-bottom: 8px; border-left-width: 5px;
+  }
+  .compare-row.band-strong { border-left-color: var(--leaf); }
+  .compare-row.band-moderate { border-left-color: var(--gold); }
+  .compare-row.band-weak { border-left-color: var(--rust); }
+  .compare-left { display: flex; align-items: center; gap: 14px; }
+  .compare-score { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; min-width: 34px; }
+  .compare-name { font-size: 14.5px; font-weight: 600; }
+  .compare-summary { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+  .compare-delete { margin-top: 0; padding: 5px 12px; font-size: 12.5px; border-radius: var(--radius-sm); }
+  .empty-note { font-size: 13px; color: var(--ink-soft); }
+
   .program-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 1rem; }
-  .program-card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
-  .program-card:hover { border-color: var(--border-strong); }
-  .program-name { font-size: 15px; font-weight: 500; }
-  .program-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-  .program-arrow { color: var(--text-secondary); font-size: 14px; }
-  .back-link { font-size: 13px; color: var(--text-secondary); cursor: pointer; margin-bottom: 4px; display: inline-block; }
-  .back-link:hover { color: var(--text-primary); }
-  .config-warning { background: #fcebeb; border: 0.5px solid #e0b3b3; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #a32d2d; margin-bottom: 1.5rem; line-height: 1.6; }
+  .program-card {
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius-lg);
+    padding: 1.1rem 1.4rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+    border-left-width: 6px; transition: border-color 0.15s ease, transform 0.1s ease;
+  }
+  .program-card:hover { transform: translateX(2px); }
+  .program-card.band-strong { border-left-color: var(--leaf); }
+  .program-card.band-moderate { border-left-color: var(--gold); }
+  .program-card.band-weak { border-left-color: var(--rust); }
+  .program-card.band-none { border-left-color: var(--line-strong); }
+  .program-name { font-size: 16px; font-weight: 700; font-family: 'Fraunces', serif; }
+  .program-meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+  .program-arrow { color: var(--ink-soft); font-size: 16px; }
+  .back-link { font-size: 13px; color: var(--ink-soft); cursor: pointer; margin-bottom: 8px; display: inline-block; font-weight: 600; }
+  .back-link:hover { color: var(--ink); }
+  .config-warning { background: var(--rust-tint); border: 1.5px solid var(--rust); border-radius: var(--radius-md); padding: 14px 18px; font-size: 13px; color: var(--rust); margin-bottom: 1.5rem; line-height: 1.6; }
 </style>
 </head>
 <body>
 
-<h1>Halcyon program relevance scorer</h1>
+<div style="display:flex; align-items:center; gap:14px; margin-bottom:4px;">
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP8AAAEjCAYAAAD9g9cqAAAbV0lEQVR4nO2dz3XjOBLGv9k399FEsOoIRj7yNHQCbDmCliOwHYHbEVgdgdURWMMEzDnx2JwIzIlgsBHsHkpaybIsESD+kt/vvX677SGAalkfUSgUCj+B9KMuZwDmAH5BVtyFNYaQ7vwc2oAkqcs5gM8AcgDTzU9XYYwhxAyKvyt1OQVwD5nlJ0ee+NujNYT0huLvQl1+hQj/FK1zOwixCMV/irqcAHiGuPfnaF2aQoht/hXagMh5QjfhE5IcP4U2IFq6ufo7soKfJUkKzvzHkODeTWgzCHEJxX+cGxyP6H9E68YMQtxB8R9nofl868AGQpxC8R8iGXuTwFYQ4hyK/z1TgzatZRsIcQ7F/56ZQRtm95HkoPjf80toAwjxAcX/nplBG2XZBkKcQ/HboQltACG6UPzvmYU2gBAfUPzvmYQ2gBAfUPx2UKENIEQXin+fusyN2mVFY9UOQjxA8RMyUih+QkYKxf+WSWgDCPEFxf+WWWgDCPEFxd+fJrQBhJhA8fdHhTaAEBMofkJGCsVPyEih+N/C47xkNFD8b5mFNoAQX1D8hIwUip+QkULxEzJSKH5CRgrFT8hIofgJGSkUPyEjheInZKRQ/G9pQxtAiC8o/rfw2i0yGih+QkbKz95HrMsnyE2418iK1vv4hBAAvmf+upwCWADIAbyiLp9QlxOvNhBCAPh3+28O/r6AvAS+8iVAiF98i39+5GcTAPcAfqAuFz6NOYIyaDOxbAMhXvAnfnH5pyeemAJ4Ql2+GN+c05/GoM3Msg2EeMHnzD/t+FwO4AV1+bx5YRBCHBDzVt8cEg94ZDyAEPvELP4tt5CXwK2HsVoPYxASBSmIH5Cg2iPq8hV1OXc2CvMOyIjwKf7GQh9TAM+Bg4LvickWQjriT/xZoWDvaqscEhR8chAUbC33R0iU+Hb7v1vubwH7+QGtxb4IiRbfuf0rSELPxGKfE0h+wO/IimuL/eraQEic7HJsppufNMiKxq/4s0KhLr9BXgC2WaAuFbLirmc/DWRZocMMwLrnuITYoS5nkO/wZ8h3c3LkmTv/p/qy4ivqcmuUbW5Rl38iK9Y9+viPLWMI8Ybsgn2GiH7aocVn/+IXLgG8wM0L4BH9ZuHWoA3v+CP+kV2mL5CEuIlm6z/D7PNL5P8S9qL/+0x7BgBbgzazHuMR0p26nG5Owb5CJtAFzGJOq1Az//YFcIG6/Ar7MYAbSHDRhNaeGYRYQia0L9CPRx3jAVnR/mSho/5INPIe8hazxSfjjL26/K9mC4Ws+NVoLEI+QnRxA/PZ/RgNsuICiCW9NyvazTbdJYDKUq+zHm1bzecnPcYi5C11uUBdvgB4hZxtmVjqWUE0BiAW8W/JigpZcQngCv3d71mPtvpj8/gx6UNdTvbW8k+w497vowBcbpbbAGIT/5asWCMrPgF4gFl1nb40Bm2mlm0gY6AuZ5uitv9Alr5TB6MoiPCb/R/GKf4tWfEVwCcAS88jm+z1T2wbQQbMzrX/AbuxrkMUjggfiF38gOwKSNbeJ+jt37c9Rq0M2sx6jEfGgLj2tw5d+0MUPhA+EKJuvykSub/aJDY84rzYmh6jtQZtmOhDjuMman+OFsDVR8IHgDi2+kyQfc+P1kj9t970t/u2wUpCBMmx34reJw0OgnvHiN/t/4isWAG4wPGg4NrCCJXm81MLY5IhUJe5p/X8MdboIHwgJbf/GPIP/Iq6XEKWAovNf3mw0Hur+fzUwpgkZcQbvUG4+M9S51RrujP/PhIUvIYEBa8s1eLTv7GX5bzGiUTut0G8WSArrnWPs6c98x8iom8t9VZB/8zBxNLYJHaknPwtJN9+GtAShRMR/VMMS/x2aQzazMCiHsNmJ/obhH/ZVxBPV5k0pvg/QqoOtdB7q//mxhgSnLhED2iu749B8Z+mgZ74Z06sIOEIs0d/CgVZ36/7dkTxn+YvHL9Z+COmbswg3nFzzLwvDewFtAcS7XdHpd2CEf+0kUo5T5DjtIvA1uyzRFZc2LxViuI/RVZUBq1mlq0gPqjLOeryGfGJXkFm+75Vqd9Bt/88DfQEzaBfKoiX9hnxrOcPqSDr+9ZF5xT/eSroiT93YgXpj6zjcwC/w6zirU8eNkfanZHuwR5fSD30Z81Wv5ruvRJL7G6pySHe2AxpBGRbnDmNZwvO/OepDNrkYLKPPrKXPtv8bf//d+F3w3YxsQJw52vioPjPIck+DfS/iGsX5gyCnchzyKw8RbqCtYGCpb17HSj+blTgut8cEfsc8lLMkYb77YsKPVJ0+8A1fxe47tdH1txzyMGXWUhTIkVBgnrLUAZ0n/nr8hbvo6NV5/Zme+axUBm0yTE21383w4c8054CFRxu4XWl+8xflz/g5xeqcP5EXQNJvV17m12lMkuu0aL3wYtk2KXCzhH39lloFALP9vvorPmVKyMOmOC8yLb//Ql1ucLm7jFnFgl/QE/8cwDDFr8kydyDMY4uNJDZvglsx//RSe9tXRnRkwWA182Fny5Zaz4/HewtPrsadbre0BhRkMnpIibhA3ri/9OZFXa4R12+bNad9jGrEjS3bkdIdodeKPpuVAAuXGfqmaIj/rUrIyySQ76YrlhrPv/7+UcSQTyrENVoU0RBknUuQwf1TtFd/BJYW7kyxCIz1OWjo76/az4/d+aJ+EJc/FfI2n4S2JoUaCA19ZaB7TiL7pHeUBdn6nLr5Fy9rNlazVZz63b4Ql6iL2BSTlfWMCymGQI98YsLY6Mmvg90K+92Za35/GcXRjhFbo79AalZR7rxgKwIkqlnin4xD3FnVrYNcUDuKNo+bNdfLp54AZN0uqIgW3hfA9uhjVluf1Zcoy4V4p8Z5rB9vXdWNAZVfedI4YUpbv6txxHbzZ/tTlK1+V911HXeHQiaQTyq3KFtXVBIyM0/pF9uv+S8PyHeQNAaWXFlvVd9kTTIigvrdthCRPUE9/GJCiL0CvKZqF69iWf3iDBxFYWEhQ/YONgjX5wFJJ972rs/u7i5OVe+dK+arT5Fue0jvz+Xbv4akh3pLhVbliqP8DcJNeh4GWbM2D3VJ6KY4fQXSWfvOzc3BoDLa7P1zzrEl+vvTvgNgG/we/ZiBvm3TByP1GAAwgeGcqT3bQWYfY6vHe2MuYC4yl1RyIpfndhigojlGXa9tTWAb8FOcJodvdahwUCEDwxF/CGQF84r9Gaaa2TFyoU5Wtif8StEcEQVgMugpULia/xDWLffFHn7rzVb3dg3RBO7wm8ggogpjdVFIprCwIQPUPx9+ab5/CzojT72hK8guesX0RVpcZOGHtVRXFtQ/H2QL0Sl2cpV5mEXntBf+BXkpNqyrzEO0U3EOsWd78KavqD4+6P7RcuDzP6yFp737OUhMhf/OPJSVhZ6Wkf+kusFA342kFNvU40W7rYgj9E/Cq7gurS07D7MsdsKbgF8N15W6JddO6SFeDiqRx9Rw5nfDrprf3+zv+Re6GxJHqIgwa61DXPeUZeLzcvzB3YlwXJI4tjLpnhICK6HLHyA4rfFCvpupq+1/zPME18aSGZiY8uY/1OXk82tuE847TUtNjkVPllGF8h0AMVvA5khTGb/uX1j9pDqOzPD1g3cJrTonCUw2SKdGLQBxN1P5dh6Lyh+eyyhP/u7qji0XUObehcNXApfXkpzjRYzg2PRM83ntzwM3d3fQvHbwmz2nzqsOmy6VlZweX3Ursa/LjONMXKD/gEJxK4M2yYHxW+XJfRn/xvrRUfkdqWZQUsFmfFbi9YcMnfY95bcsN0o3P0tFL9NzGb/CfpF498i7rGpu3/nIZPNR1kzk6rJ1RiCfPtQ/PZZQn/2zzeztQ1Mz7WvInd5W41nc4P+dV/ayUPx20ZmfxP38X4TpDNHlg8Lg5Yt4r5arO28FDFb77dDTeE9BcXvAkkJbTVbTSB3D056jGzq7vtMaDG5+UlnVs4d9z8YzAp4hkRmxwnkl/wLJLCVHzzVYlsvLpwrewf9lNoZxG2/1h7NfNb3ndCygt5LqtHMrzdZ768M2iRPnLn98kWeQsQwgfxCJzCPYIe5Ftk8v1y/6IekwS40x1GQDD6l2a4fsr3Z5QWgoHuOvi7/gV7Mw02R1wQIK35Zn003f35Dt+u5TWnguwSTWaHPLZedZ2RZKvxjMMZDsHrz5yvuVNCtDiRe4Q9NS+KorhQA9+J/66b/G29ndN8o+K7I0n2WO0Shq61mY7TIik+6RllFXv5fIN+NKWS51gD4w0iQsmOimzUZZ1VlD9gR/3E3ffuz2Gjh86imzMo/YPZZKHR5AegfKQZkT39pYFO86C99wr8AA9I94LerkDvFzk2fIr1rnaaQQJyf8/RZoVCX1zC7OnwCOdb68QtADgdNNftVGGaQK9d8vnJgQzK8n/nFTZ9CRB3aTXdJ9zW1DfpVlVX4yAMwC/StkBX6OwoxYxb3GO16HwB+3oj9EfG66a64h983/wMkr31q0HaCYx6AfOHnBv0NcV87N2jTWLYhKbZJPjnGJXzA3S2+x5EYQ5/ZdgJ5ASz2fjaHvkfWDLESLfSXn+4udEmEf20+gDawHaGYex1NlhnLHj1MIFmAXzd//2LQh83KtjGhm9zTuDAiJbYz/1C/EB+hIC6/8j6y3NfX9OzlvkcC0brn2LGSaz5vkmY8KLbR/iWkVNIkmCVuqCAC/wvbu+DjOLa5jf5PevSRG7RpBrmnbXYgqrJsRXKI+GU76gEuy0q5o938+RMi9AY6p8BCkBUN6vIONs/xd2OoHl5u0KaxbENy7Pb5s2KJuvwNZodDXKOwFTXwN7YzesoBm6xYbT7vW4+jVh7H8slvms83Y6nTd4rDJJ87SNQ/926JUGHnpjcQgVeBbHFPVtxtUlxnnsZrvIzjn5nm840DG5LjrfjlbXjp8JpjYCvqt276mN/ElzBP/9Whddx/GHaZpzr8Zd+Q9Die3isz0h/Y3aCii8JW1MB/MAQ33RUSb7lC/wDgOaYO+w7JzKBNZdmGJDl/sEciqduTV7OD/9ps/vyNMbjpLul/n955siLO+g19MDnROMTPwQB+CDEh2XsudwD8nmfwgVz5Nddo4feS1IhhDb+YkEMmLgtpmmQExk6u+XzjwIYkofhjQ87Yrxz1Pu9ZIDQu5GzGRLMVg30bKP4YkeO2Kwc9T+A/scglM4M2jWUbkoXijxV3L4B5gCuvXaF7mIc7TntQ/DHj7gXwNJAXwEzz+caBDclC8ceO2xfAc+IxgFzz+dGf5NuH4k8BeQG4KLs1B/CapBdgdpKvtWxF0lD8qSDbgC5eABOIF/Cjx732IcgN2jSWbUgaij8l5AVwCTdFSGaQMmEvXsubmaN7km/IB5uMoPhTQzL0LuFuFsshS4HYazvkms9XDmxImnGl94pbmx/8tIWkfLaeremHBOqe4fb4dQPfV5x1waxM93JTQo1sGL74d1dCLc482UJKWq+i+7Kfwvw6sK40iO0FYHYIatQ1+o8xXLe/LuebIpcv6FadaAopY/Zj8+VKA7lo8wruipHO4Pq0oT4zgzaNZRuSZ1gzv7iDC0gx0mnP3tJyE90vA8Ld6HuISeViHuN9xzA+EIlO30CEP7HYc1ovAMD0ptouKMiNtspB33rU5X81W/AY7xHSdvvrMt+c536FlB2bWB7hNrkEGDkVeAH7bu4EfouNHscsuYeZfUdIT/x1OUFdLjbXUr/A/a07j8mlwGZFg6y4gNQGUBZ7jqEeQG7QprFswyBIR/x1Od1Etl8hx1KnnkaewG003R07L6Cy1OPUcOa1ie5JPoDiP8rxAp4x0X2rzgUVgG/IinWAse0g+QuXm8/RxkszR1gx5ZrPq+RyODwRr/hlrX0DXzXt37KCiL4JMLYbJDPw08Z76nM127/tGGSAeB0TzVaVdTsGQlzil6j9AmHuDWwh11kto4houyIrvqIul5DgncnnPLNrkBa5QRuW7fqAOMQvb/TtVp1vKgDfR5X9JS+37UvgEXFe0XYMk/V+ZduIoRB2n19c++2dAL5ZYWiuvSmym3GLbp7AGllx5dii49TlP9D1VJjc8yH+Z/7dF+0L/N8io7DL3289jx0vbz2BW5z+3YRxo83W+411OwaEP/GHde0byCy/CjB2OmxfAvIiWOC4V9b6NGmP3KBNZdmGQeFe/HJI5gbhXPvvg7ulxgfyolwdSZ2uAln02aANM/tO4GY9ZPeAjS4Ku/V863nsYVOXebAXqX4+PwD8Ouidm57YFb/MEveQlNuJ1b7P0wJ4gASklOexiUvMzu+3yIpPDqwZDHbcfskeM73Ouy9ryCxfBRib+MFki29t24ihYS5+ce3nENFPrVjTHQW69mNibtCG6/0z6Ivf3dn5LrRIsdQWMUd2iaYGLSurdgyQ7uIX1/4G7o/QHqNC6gdsiCm5QZuGk8N5dGZ+n8doAXHt15DyUa3HcUlcmNQQ+MO6FQNER/x38FPIscUYDtiQ88gSc2bQcm3VjoHSXfxZsUZdruAuQ6/C2A7YkHPMDdrwGu6O6AX8suJ68zbOLdqwQmoHbCT+McPbgGcDWWu23u0ZLiYu/9q2EUPFLMmnLp/QzwNokZpr3z2BqUVq/7YYkc/71aDlFQPD3TDP8JOsqyfobfc1SO2AjeQzmJx5V5Bg5dKuQSPB/CYipvR2pF967y7R51y5rTVSzMKTPeZn9NvlWEOuilL9DRoRUp15qtkqXK2BBOmX3itf6NXmz3YtvE+6wRcR/gv6JzLNIWfgv/bsZzzI92hq0JJbfBrYPdKb2sz+EfaEv6Wx1M9YMAn0KTDYp0U6dft9IbEMW8JXkBtu1xb6Gge74+C68DSnJnEU8IwFqV7zZKk3BRF+Y6m/sXBr2O67TSPGAGf+LRR+LJi4/O1glpweofgBCj8W5PcwNWjJWd8Ail/2k20JvwGF3wfTOxFXNo0YC+Ne8/fPVNyngQhfWepvXJhv77EMuyHjnfkp/Nh4NGz3zaoVI2Kc4qfw40LW+jODlhWXWOaMy+03z9P/iApykERZ6m+smK71H6xaMTLGI34R/gvs3TK7QlZcW+prvEjAdWrQsuL2Xj/G4fZT+HEiv5cbw9ac9XsyfPFT+DGjeyR8C2d9Cwxb/BR+vMjW3tywNWd9Cwx3zW//ZN51UkVIYkZeyqaJVSvO+nYY5sxP4cdOn1ueOOtbYnjip/DjRo5M3xq25h0OFhmW+Cn8uOnn7rcAlrZMIUMSv2SJ2S7CsbLQF9nxDPPfzx2TqewyjIAfj+TGjyTz5IatK1ZDsk/6Mz+FHz+yzjdN4VUAuL3qgLTFT+HHj8Rh+vyOGORzRLriZxGO+NkF+CaGPVS89MQdaa75eSQ3FZ5hnl2pQHffKenN/BR+GsjvKe/RA919x/S7rss3FH4a1OUjzBN5AF675YU03H4W4UgHCcLe9uihBd19L8Qvfp7MSwc7uy+81NQTca/5Kfx0sCP8B57Y80e8a34KPx3sCJ/rfM/EOfNT+OlgR/gtuM73Tnxrfp7MSwc7wldg8DUIcc38FH461OUt7GRYXjOzMgzxzPwUfjrYy7d44Gm9cMQR8KPw08BuvgXjMIEJL35ZNz7CXhGOK24XOcBuELZBVlxY6If0IKzbzyO5aSCe2TPMi27u0wC4tNAP6Um4mZ/CTwMpxNHnWO4+CsAnRvbjIEy0n8JPA6mZ0Kfu3j4KPEgVFf5nfvlCmZZ0OqQBt4rssyvCMbfUowJf0NHhV/w8khs/dtf3AIUfLf7cfgo/fiRx5wco/FEQT5JPdxpQ+HYRN/8Z/SrvHKJA4UeNv5lfEjpWPXtZg8K3i0TzX0Hhj44QAb9bSMBvotFKQVJBl/YNGin2qyNtUaDwkyDMPr988W4BfMHp9WUL4DuAJWd7i9RlDonmTy33rEDhJ0MM6b1TSMrobO+nDYCWXyLL2N/C26eFpFY3DvomDggvfuIHu2coDmnAWExyUPxDRzyrvjX0T9GAwk8Sin+o7OIqtrIpj8FjuQkTVyUfYgdx8V/hVvgPFH7acOYfEhLFf4S9wqfHUJDzFGuHYxAPUPxDQPLxH+FuXb+lBSP6g4HiTxkJ5t3DfqLOMSqwyu6goPhTxK/oAVnff/U0FvEExZ8S/kWvwJqIg4XiTwH/ogfo5g8eij9mJHp/D/eBvEPueIhq+FD8MSL79Ddwu2V3jAYsizYaKP5YENd+gfMnHV3BoN7IoPhDI679F/hdz+/TgLP9KKH4QyB59wuIaz8NZIUC8I2z/Xih+H0imXg3kPP0k4CWVJDZvg1oAwkMxe8DCeB9gf+o/SEtJJK/DmwHiQCK3xVxuPZbFIBvYDk0sgfFb5tdQs4cYV37LStIJL8NbAeJDIrfFhK1367nY6CCuPhNYDtIpFD8fZG69zcIv57fUkFm+iqwHSRyKH5TJIh3j/Dr+S0VKHqiAcWvC0VPBgLF35X4RL+CJOk0ge0giULxnyMu0SvIlt2K0XvSF4r/I+ISfQXgO7JiFdgOMiAo/kMkev+IOES/Al174giKf0u4whmHKNC1Jx6g+CUj7xHhk3Na8EZi4pHxit/PdVZdaCFbdavAdpCRMU7xx7Gub0HRk4CMS/zub6ztggKLaJAIGI/46/Irwrr4CjxWSyJi+OKX6jlP8F8Jd58V5ISdCmgDIW8YtvjDz/YVeKyWRMowxR9+tm/Bclkkcv4V2gDr1OUtgBeEE/4DgAsKn8TOcGZ+2bd/QrhknQqsiEsSYhjiFzf/GWH27RXExV8FGJsQY9J3++X03QvCCH8N4BOFT1Ik7Zm/Lh8hKbq+URAXfx1gbEKskKb4ZX3/iDD321XgvfVkAKQnfhF+qGg+760ngyEt8YcTfguZ7RvP4xLijHQCfnIoJ4Tw15B9+8bzuIQ4JY2ZX7byXuD/+iu6+WSwxC9+mfF/wK/wFcTNrzyOSYhX4nb7ZY3/DL/CbwBcUvhk6MQ784cJ7jUQ4SuPYxIShDhn/jDCr0DhkxHxc2gDPsD3cdwVsuLa43iEBCe+mb8ufZ/Mo/DJKIlrzS8XZ7x4HLFBVlx4HI+QaIht5n/0OFYD4NLjeIRERTwzv+znv3oaTUGy9lpP4xESHTHN/DOPY11R+GTsjFH8D0zgISQu8SsPY1S8KYcQISbxN477VwCuHI9BSDLEI35xxZXDEa6ZvUfIjnjEL6wd9btkvT1C3hKb+O9gf/ZvIRdpEEL2iEv84pZfwu4LgO4+IUeIS/wANuWyLmAnALjkth4hx4lP/AA2CTiXkKutTWlBd5+QD4knvfcj5EaeR+hX82E1HkJOEL/4AZO7+NbICu7pE3KCON3+Q3ZxgHWHpxUAns8n5AxpzPz71OUtTh/9ZbltQjqQnviBU3X8WZyDkI78D8Eur9K2VeSyAAAAAElFTkSuQmCC" alt="Halcyon logo" style="height:40px; width:auto;">
+  <h1 style="margin-bottom:0;">Halcyon program relevance scorer</h1>
+</div>
 
 <div id="config-warning" class="config-warning" style="display:none;">
-  Supabase isn't configured yet. Open this file and set SUPABASE_URL and SUPABASE_ANON_KEY near the top of the &lt;script&gt; tag. See the setup notes provided alongside this file.
+  Supabase isn't configured yet. Open this file and set SUPABASE_URL and SUPABASE_ANON_KEY near the top of the &lt;script&gt; tag.
 </div>
 
 <div id="score-home">
-  <p class="sub">Each program defines its own subsectors, keywords, and customer profile terms. Scoring is a quick keyword screen, not a full review.</p>
+  <p class="sub">Scoring checks each program's subsector, keyword, and customer-profile terms against the pasted application text and averages keyword matching into a 1–5 score. It's a fast keyword screen, not a full review — useful for a first pass, not a final verdict.</p>
+
+  <div class="dashboard" id="dashboard"></div>
+
   <button id="new-program-btn">Start new program</button>
   <div class="program-grid" id="program-grid"></div>
 </div>
@@ -86,7 +239,7 @@
   <label class="field-label" for="new-program-name">Program name</label>
   <input type="text" id="new-program-name" placeholder="e.g. Francophone Africa Food Access Cohort">
   <label class="field-label" for="new-program-subsectors">Subsectors</label>
-  <div class="field-hint">One per line: Name: description (colon or dash). Description words are used as extra match terms.</div>
+  <div class="field-hint">One per line: Name: description. Description words become extra match terms.</div>
   <textarea id="new-program-subsectors" placeholder="Food Security: improving access to affordable, nutritious food for underserved populations"></textarea>
   <label class="field-label" for="new-program-keywords">Additional keywords</label>
   <div class="field-hint">One per line or comma-separated</div>
@@ -103,11 +256,11 @@
   <span class="back-link" id="program-back">&larr; Back to programs</span>
   <div style="display:flex; align-items:center; justify-content:space-between;">
     <h1 id="program-title" style="margin-bottom:0;"></h1>
-    <button class="secondary" id="program-edit-btn" style="margin-top:0; padding:6px 12px; font-size:13px;">Edit</button>
+    <button class="secondary" id="program-edit-btn" style="margin-top:0; padding:7px 14px; font-size:13px;">Edit</button>
   </div>
 
   <div id="program-view-mode">
-    <div class="breakdown-item" style="padding-top:14px;"><div class="breakdown-title">Subsectors</div><div id="view-subsectors"></div></div>
+    <div class="breakdown-item" style="padding-top:16px;"><div class="breakdown-title">Subsectors</div><div id="view-subsectors"></div></div>
     <div class="breakdown-item"><div class="breakdown-title">Additional keywords</div><div id="view-keywords"></div></div>
     <div class="breakdown-item"><div class="breakdown-title">Customer profile</div><div id="view-profile"></div></div>
   </div>
@@ -125,7 +278,7 @@
     <br>
     <button id="edit-program-save">Save changes</button>
     <button class="secondary" id="edit-program-cancel">Cancel</button>
-    <button class="secondary" id="edit-program-delete" style="color:#a32d2d;">Delete program</button>
+    <button class="secondary danger" id="edit-program-delete">Delete program</button>
     <div id="edit-program-error" class="error"></div>
   </div>
 
@@ -144,18 +297,16 @@
 </div>
 
 <script>
-// ===================== SUPABASE CONFIG — FILL THESE IN =====================
+// ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = 'https://yxejvawjvnsfwzxzismx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4ZWp2YXdqdm5zZnd6eHppc214Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTgyMzQsImV4cCI6MjEwNDUzNDIzNH0.Jjzcgy7GMB964Md6Lt6CHVSqOl34yGgJjxMtm4MXLAM';
-// =============================================================================
+// =============================================================
 
 let supabaseClient = null;
 if (SUPABASE_URL !== 'YOUR_SUPABASE_PROJECT_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 } else {
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('config-warning').style.display = '';
-  });
+  document.addEventListener('DOMContentLoaded', () => { document.getElementById('config-warning').style.display = ''; });
 }
 
 const STOPWORDS = new Set(['a','an','the','to','for','of','in','and','on','with','that','this','is','are','will','from','by','or','as','at','be','it','its','their','our','we','they','who','which','into','across','through','about','than','then','these','those','such','can','may','also','not','but','have','has','had','was','were','been','being','more','most','other','some','any','all','each','both','over','under','between','so']);
@@ -183,11 +334,12 @@ function parseSubsectorList(raw) {
     return { name: line, description: '', descriptionWords: [] };
   });
 }
-function scoreTagClass(score) { if (score >= 4) return 'strong'; if (score >= 3) return 'moderate'; return 'weak'; }
+function scoreBand(score) { if (score >= 4) return 'strong'; if (score >= 3) return 'moderate'; return 'weak'; }
 function scoreTagLabel(score) { if (score >= 4) return 'Strong fit'; if (score >= 3) return 'Moderate fit'; return 'Weak fit'; }
 
 let currentProgramId = null;
 let lastScoreResult = null;
+let scoreChart = null;
 
 function showScoreSubview(view) {
   document.getElementById('score-home').style.display = view === 'home' ? '' : 'none';
@@ -202,28 +354,29 @@ function renderSubsectorChips(container, subsectors) {
   if (subsectors.length === 0) { container.innerHTML = '<span class="empty-note">Not set</span>'; return; }
   container.innerHTML = subsectors.map(s => `
     <div class="subsector-block">
-      <div class="subsector-name-row"><span style="font-size:13px; font-weight:500;">${s.name}</span></div>
+      <div class="subsector-name-row"><span style="font-size:13px; font-weight:700;">${s.name}</span></div>
       ${s.description ? `<div class="empty-note" style="margin-bottom:4px;">${s.description}</div>` : ''}
     </div>
   `).join('');
 }
 
-// ---- Data access (Supabase) ----
+// ---- Data access ----
 async function fetchPrograms() {
   const { data, error } = await supabaseClient.from('programs').select('*').order('created_at', { ascending: false });
   if (error) { console.error(error); return []; }
   return data;
 }
+async function fetchAllEntries() {
+  const { data, error } = await supabaseClient.from('entries').select('*');
+  if (error) { console.error(error); return []; }
+  return data;
+}
 async function insertProgram(program) {
-  const { error } = await supabaseClient.from('programs').insert({
-    name: program.name, subsectors: program.subsectors, keywords: program.keywords, profile: program.profile
-  });
+  const { error } = await supabaseClient.from('programs').insert({ name: program.name, subsectors: program.subsectors, keywords: program.keywords, profile: program.profile });
   if (error) console.error(error);
 }
 async function updateProgramRow(id, program) {
-  const { error } = await supabaseClient.from('programs').update({
-    name: program.name, subsectors: program.subsectors, keywords: program.keywords, profile: program.profile
-  }).eq('id', id);
+  const { error } = await supabaseClient.from('programs').update({ name: program.name, subsectors: program.subsectors, keywords: program.keywords, profile: program.profile }).eq('id', id);
   if (error) console.error(error);
 }
 async function deleteProgramRow(id) {
@@ -236,9 +389,7 @@ async function fetchEntries(programId) {
   return data;
 }
 async function upsertEntry(programId, ventureName, score, summary) {
-  const { error } = await supabaseClient.from('entries').upsert({
-    program_id: programId, venture_name: ventureName, score, summary, updated_at: new Date().toISOString()
-  }, { onConflict: 'program_id,venture_name' });
+  const { error } = await supabaseClient.from('entries').upsert({ program_id: programId, venture_name: ventureName, score, summary, updated_at: new Date().toISOString() }, { onConflict: 'program_id,venture_name' });
   if (error) console.error(error);
 }
 async function deleteEntry(id) {
@@ -246,20 +397,76 @@ async function deleteEntry(id) {
   if (error) console.error(error);
 }
 
+// ---- Dashboard ----
+async function renderDashboard(programs, allEntries) {
+  const dash = document.getElementById('dashboard');
+  if (programs.length === 0) {
+    dash.innerHTML = '<div class="dashboard-empty">Your dashboard fills in once you start a program and score a few ventures.</div>';
+    return;
+  }
+  const totalVentures = allEntries.length;
+  const avgScore = totalVentures > 0 ? (allEntries.reduce((s, e) => s + e.score, 0) / totalVentures) : 0;
+
+  dash.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-tile accent-leaf"><span class="stat-number">${programs.length}</span><div class="stat-label">Programs</div></div>
+      <div class="stat-tile accent-sun"><span class="stat-number">${totalVentures}</span><div class="stat-label">Ventures scored</div></div>
+      <div class="stat-tile accent-sky"><span class="stat-number">${totalVentures > 0 ? avgScore.toFixed(1) : '—'}</span><div class="stat-label">Average score</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Score distribution across all programs</div>
+      <div class="chart-wrap"><canvas id="score-distribution-chart"></canvas></div>
+    </div>
+  `;
+
+  if (totalVentures === 0) {
+    document.querySelector('.chart-card').innerHTML = '<div class="chart-card-title">Score distribution across all programs</div><p class="empty-note">No ventures scored yet.</p>';
+    return;
+  }
+
+  const counts = [1,2,3,4,5].map(n => allEntries.filter(e => e.score === n).length);
+  const barColors = ['#C1440E', '#D6A417', '#D6A417', '#1E8F5F', '#0F6844'];
+  const ctx = document.getElementById('score-distribution-chart');
+  if (scoreChart) scoreChart.destroy();
+  scoreChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['1', '2', '3', '4', '5'],
+      datasets: [{ data: counts, backgroundColor: barColors, borderRadius: 6, maxBarThickness: 48 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0, color: '#55654F', font: { family: 'Karla' } }, grid: { color: '#D8E0C9' } },
+        x: { ticks: { color: '#55654F', font: { family: 'Karla', weight: '600' } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
 // ---- Home ----
 async function renderProgramGrid() {
   if (!supabaseClient) return;
-  const programs = await fetchPrograms();
+  const [programs, allEntries] = await Promise.all([fetchPrograms(), fetchAllEntries()]);
+  await renderDashboard(programs, allEntries);
+
   const grid = document.getElementById('program-grid');
   grid.innerHTML = '';
   if (programs.length === 0) { grid.innerHTML = '<p class="empty-note">No programs yet. Start one above.</p>'; return; }
   programs.forEach(p => {
+    const programEntries = allEntries.filter(e => e.program_id === p.id);
+    const avg = programEntries.length > 0 ? (programEntries.reduce((s, e) => s + e.score, 0) / programEntries.length) : null;
+    const band = avg === null ? 'none' : scoreBand(Math.round(avg));
+    const metaText = programEntries.length === 0
+      ? 'No ventures scored yet'
+      : `${programEntries.length} venture${programEntries.length === 1 ? '' : 's'} scored · avg ${avg.toFixed(1)}`;
     const card = document.createElement('div');
-    card.className = 'program-card';
+    card.className = `program-card band-${band}`;
     card.innerHTML = `
       <div>
         <div class="program-name">${p.name}</div>
-        <div class="program-meta">Created ${new Date(p.created_at).toLocaleDateString()}</div>
+        <div class="program-meta">${metaText}</div>
       </div>
       <span class="program-arrow">&rarr;</span>
     `;
@@ -384,7 +591,7 @@ function scoreAgainstCriteria(program, ventureText) {
 function renderScoreResults(data) {
   const resultsEl = document.getElementById('score-results');
   resultsEl.innerHTML = '';
-  const tagCls = scoreTagClass(data.score);
+  const band = scoreBand(data.score);
   const card = document.createElement('div');
   card.className = 'card';
   let breakdownHTML = data.breakdown.map(b => {
@@ -404,7 +611,7 @@ function renderScoreResults(data) {
   card.innerHTML = `
     <div class="score-head">
       <div class="score-left"><span class="score-number">${data.score}</span><span class="score-out-of">/ 5</span></div>
-      <span class="score-tag ${tagCls}">${scoreTagLabel(data.score)}</span>
+      <span class="score-tag ${band}">${scoreTagLabel(data.score)}</span>
     </div>
     <div class="rationale" style="margin-bottom: 10px;">${data.summary}</div>
     ${breakdownHTML}
@@ -448,8 +655,9 @@ async function renderCompareList(programId) {
   if (entries.length === 0) { container.innerHTML = '<p class="empty-note">No scored ventures yet for this program.</p>'; return; }
   container.innerHTML = '';
   entries.forEach(entry => {
+    const band = scoreBand(entry.score);
     const row = document.createElement('div');
-    row.className = 'compare-row';
+    row.className = `compare-row band-${band}`;
     row.innerHTML = `
       <div class="compare-left">
         <span class="compare-score">${entry.score}/5</span>
