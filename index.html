@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Halcyon program relevance scorer</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --border: #ddd9cf; --border-strong: #b8b4a8; --text-primary: #1f1e1a; --text-secondary: #6b6a63;
+    --surface-1: #f4f2ec; --surface-2: #ffffff;
+    --score-good: #3b6d11; --score-good-bg: #eaf3de; --score-mid: #854f0b; --score-mid-bg: #faeeda;
+    --score-low: #a32d2d; --score-low-bg: #fcebeb; --hit: #eaf3de; --hit-text: #3b6d11; --miss: #f0eee6; --miss-text: #8c897e;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; color: var(--text-primary); background: var(--surface-1); }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  h2 { font-size: 16px; font-weight: 500; margin: 2rem 0 0.75rem; }
+  .sub { color: var(--text-secondary); font-size: 14px; margin-bottom: 1.5rem; }
+  label.field-label { display: block; font-size: 13px; font-weight: 500; margin: 1rem 0 4px; color: var(--text-secondary); }
+  .field-hint { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  input[type="text"] { width: 100%; padding: 10px 12px; border: 0.5px solid var(--border-strong); border-radius: 8px; font-size: 14px; font-family: inherit; background: var(--surface-2); color: var(--text-primary); }
+  textarea { width: 100%; min-height: 90px; padding: 12px; border: 0.5px solid var(--border-strong); border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; background: var(--surface-2); color: var(--text-primary); }
+  textarea#score-venture-text { min-height: 180px; }
+  button { margin-top: 14px; padding: 10px 18px; border: 0.5px solid var(--border-strong); border-radius: 8px; background: var(--surface-2); font-size: 14px; font-weight: 500; cursor: pointer; }
+  button:hover { background: var(--surface-1); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: transparent; }
+  .error { color: #a32d2d; font-size: 13px; margin-top: 8px; }
+  .results { margin-top: 2rem; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; }
+  .placeholder { color: var(--text-secondary); font-size: 14px; }
+  .score-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .score-left { display: flex; align-items: baseline; gap: 10px; }
+  .score-number { font-size: 32px; font-weight: 500; }
+  .score-out-of { font-size: 14px; color: var(--text-secondary); }
+  .score-tag { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 6px; }
+  .score-tag.strong { background: var(--score-good-bg); color: var(--score-good); }
+  .score-tag.moderate { background: var(--score-mid-bg); color: var(--score-mid); }
+  .score-tag.weak { background: var(--score-low-bg); color: var(--score-low); }
+  .rationale { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
+  .breakdown-item { padding: 10px 0; border-top: 0.5px solid var(--border); }
+  .breakdown-item:first-child { border-top: none; }
+  .breakdown-title { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .subsector-block { margin-bottom: 10px; }
+  .subsector-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .term-chip { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 5px; margin: 0 4px 4px 0; }
+  .term-chip.hit { background: var(--hit); color: var(--hit-text); }
+  .term-chip.miss { background: var(--miss); color: var(--miss-text); text-decoration: line-through; }
+  .term-chip.name-hit { background: var(--score-good-bg); color: var(--score-good); font-weight: 500; }
+  .term-chip.name-miss { background: var(--miss); color: var(--miss-text); font-weight: 500; }
+  .compare-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+  .compare-left { display: flex; align-items: center; gap: 12px; }
+  .compare-score { font-size: 16px; font-weight: 500; min-width: 32px; }
+  .compare-name { font-size: 14px; }
+  .compare-summary { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .compare-delete { margin-top: 0; padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+  .empty-note { font-size: 13px; color: var(--text-secondary); }
+  .program-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 1rem; }
+  .program-card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  .program-card:hover { border-color: var(--border-strong); }
+  .program-name { font-size: 15px; font-weight: 500; }
+  .program-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .program-arrow { color: var(--text-secondary); font-size: 14px; }
+  .back-link { font-size: 13px; color: var(--text-secondary); cursor: pointer; margin-bottom: 4px; display: inline-block; }
+  .back-link:hover { color: var(--text-primary); }
+  .config-warning { background: #fcebeb; border: 0.5px solid #e0b3b3; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #a32d2d; margin-bottom: 1.5rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>Halcyon program relevance scorer</h1>
+
+<div id="config-warning" class="config-warning" style="display:none;">
+  Supabase isn't configured yet. Open this file and set SUPABASE_URL and SUPABASE_ANON_KEY near the top of the &lt;script&gt; tag. See the setup notes provided alongside this file.
+</div>
+
+<div id="score-home">
+  <p class="sub">Each program defines its own subsectors, keywords, and customer profile terms. Scoring is a quick keyword screen, not a full review.</p>
+  <button id="new-program-btn">Start new program</button>
+  <div class="program-grid" id="program-grid"></div>
+</div>
+
+<div id="score-new-program" style="display:none;">
+  <span class="back-link" id="new-program-back">&larr; Back</span>
+  <p class="sub">Name the program and define its keyword criteria. Leave a box blank to skip that category.</p>
+  <label class="field-label" for="new-program-name">Program name</label>
+  <input type="text" id="new-program-name" placeholder="e.g. Francophone Africa Food Access Cohort">
+  <label class="field-label" for="new-program-subsectors">Subsectors</label>
+  <div class="field-hint">One per line: Name: description (colon or dash). Description words are used as extra match terms.</div>
+  <textarea id="new-program-subsectors" placeholder="Food Security: improving access to affordable, nutritious food for underserved populations"></textarea>
+  <label class="field-label" for="new-program-keywords">Additional keywords</label>
+  <div class="field-hint">One per line or comma-separated</div>
+  <textarea id="new-program-keywords" placeholder="francophone, cooperative, supply chain"></textarea>
+  <label class="field-label" for="new-program-profile">Customer profile</label>
+  <div class="field-hint">Who the venture should serve, one per line or comma-separated</div>
+  <textarea id="new-program-profile" placeholder="underserved communities, rural areas, smallholder farmers"></textarea>
+  <br>
+  <button id="new-program-save">Save program</button>
+  <div id="new-program-error" class="error"></div>
+</div>
+
+<div id="score-program" style="display:none;">
+  <span class="back-link" id="program-back">&larr; Back to programs</span>
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <h1 id="program-title" style="margin-bottom:0;"></h1>
+    <button class="secondary" id="program-edit-btn" style="margin-top:0; padding:6px 12px; font-size:13px;">Edit</button>
+  </div>
+
+  <div id="program-view-mode">
+    <div class="breakdown-item" style="padding-top:14px;"><div class="breakdown-title">Subsectors</div><div id="view-subsectors"></div></div>
+    <div class="breakdown-item"><div class="breakdown-title">Additional keywords</div><div id="view-keywords"></div></div>
+    <div class="breakdown-item"><div class="breakdown-title">Customer profile</div><div id="view-profile"></div></div>
+  </div>
+
+  <div id="program-edit-mode" style="display:none;">
+    <label class="field-label" for="edit-program-name">Program name</label>
+    <input type="text" id="edit-program-name">
+    <label class="field-label" for="edit-program-subsectors">Subsectors</label>
+    <div class="field-hint">One per line: Name: description</div>
+    <textarea id="edit-program-subsectors"></textarea>
+    <label class="field-label" for="edit-program-keywords">Additional keywords</label>
+    <textarea id="edit-program-keywords"></textarea>
+    <label class="field-label" for="edit-program-profile">Customer profile</label>
+    <textarea id="edit-program-profile"></textarea>
+    <br>
+    <button id="edit-program-save">Save changes</button>
+    <button class="secondary" id="edit-program-cancel">Cancel</button>
+    <button class="secondary" id="edit-program-delete" style="color:#a32d2d;">Delete program</button>
+    <div id="edit-program-error" class="error"></div>
+  </div>
+
+  <h2>Score a venture</h2>
+  <label class="field-label" for="score-venture-name">Venture name</label>
+  <input type="text" id="score-venture-name" placeholder="e.g. Solterra Ag">
+  <label class="field-label" for="score-venture-text">Venture application text</label>
+  <textarea id="score-venture-text" placeholder="Paste venture application text here..."></textarea>
+  <br>
+  <button id="score-run">Score relevance</button>
+  <div id="score-error" class="error"></div>
+  <div class="results" id="score-results"></div>
+
+  <h2>Comparison list</h2>
+  <div id="compare-list"></div>
+</div>
+
+<script>
+// ===================== SUPABASE CONFIG — FILL THESE IN =====================
+const SUPABASE_URL = 'https://yxejvawjvnsfwzxzismx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4ZWp2YXdqdm5zZnd6eHppc214Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTgyMzQsImV4cCI6MjEwNDUzNDIzNH0.Jjzcgy7GMB964Md6Lt6CHVSqOl34yGgJjxMtm4MXLAM';
+// =============================================================================
+
+let supabaseClient = null;
+if (SUPABASE_URL !== 'YOUR_SUPABASE_PROJECT_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('config-warning').style.display = '';
+  });
+}
+
+const STOPWORDS = new Set(['a','an','the','to','for','of','in','and','on','with','that','this','is','are','will','from','by','or','as','at','be','it','its','their','our','we','they','who','which','into','across','through','about','than','then','these','those','such','can','may','also','not','but','have','has','had','was','were','been','being','more','most','other','some','any','all','each','both','over','under','between','so']);
+
+function parseTermList(raw) {
+  return raw.split(/[\n,]/).map(t => t.trim()).filter(t => t.length > 0);
+}
+function extractDescriptionWords(desc) {
+  return [...new Set(desc.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !STOPWORDS.has(w)))];
+}
+function parseSubsectorList(raw) {
+  return raw.split('\n').map(l => l.trim()).filter(l => l.length > 0).map(line => {
+    const match = line.match(/^(.+?)[:\-–—](.*)$/);
+    if (match) {
+      const name = match[1].trim();
+      const description = match[2].trim();
+      return { name, description, descriptionWords: extractDescriptionWords(description) };
+    }
+    return { name: line, description: '', descriptionWords: [] };
+  });
+}
+function scoreTagClass(score) { if (score >= 4) return 'strong'; if (score >= 3) return 'moderate'; return 'weak'; }
+function scoreTagLabel(score) { if (score >= 4) return 'Strong fit'; if (score >= 3) return 'Moderate fit'; return 'Weak fit'; }
+
+let currentProgramId = null;
+let lastScoreResult = null;
+
+function showScoreSubview(view) {
+  document.getElementById('score-home').style.display = view === 'home' ? '' : 'none';
+  document.getElementById('score-new-program').style.display = view === 'new' ? '' : 'none';
+  document.getElementById('score-program').style.display = view === 'program' ? '' : 'none';
+}
+function renderSimpleChips(container, terms) {
+  if (terms.length === 0) { container.innerHTML = '<span class="empty-note">Not set</span>'; return; }
+  container.innerHTML = terms.map(t => `<span class="term-chip hit">${t}</span>`).join('');
+}
+function renderSubsectorChips(container, subsectors) {
+  if (subsectors.length === 0) { container.innerHTML = '<span class="empty-note">Not set</span>'; return; }
+  container.innerHTML = subsectors.map(s => `
+    <div class="subsector-block">
+      <div class="subsector-name-row"><span style="font-size:13px; font-weight:500;">${s.name}</span></div>
+      ${s.description ? `<div class="empty-note" style="margin-bottom:4px;">${s.description}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ---- Data access (Supabase) ----
+async function fetchPrograms() {
+  const { data, error } = await supabaseClient.from('programs').select('*').order('created_at', { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data;
+}
+async function insertProgram(program) {
+  const { error } = await supabaseClient.from('programs').insert({
+    name: program.name, subsectors: program.subsectors, keywords: program.keywords, profile: program.profile
+  });
+  if (error) console.error(error);
+}
+async function updateProgramRow(id, program) {
+  const { error } = await supabaseClient.from('programs').update({
+    name: program.name, subsectors: program.subsectors, keywords: program.keywords, profile: program.profile
+  }).eq('id', id);
+  if (error) console.error(error);
+}
+async function deleteProgramRow(id) {
+  const { error } = await supabaseClient.from('programs').delete().eq('id', id);
+  if (error) console.error(error);
+}
+async function fetchEntries(programId) {
+  const { data, error } = await supabaseClient.from('entries').select('*').eq('program_id', programId).order('score', { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data;
+}
+async function upsertEntry(programId, ventureName, score, summary) {
+  const { error } = await supabaseClient.from('entries').upsert({
+    program_id: programId, venture_name: ventureName, score, summary, updated_at: new Date().toISOString()
+  }, { onConflict: 'program_id,venture_name' });
+  if (error) console.error(error);
+}
+async function deleteEntry(id) {
+  const { error } = await supabaseClient.from('entries').delete().eq('id', id);
+  if (error) console.error(error);
+}
+
+// ---- Home ----
+async function renderProgramGrid() {
+  if (!supabaseClient) return;
+  const programs = await fetchPrograms();
+  const grid = document.getElementById('program-grid');
+  grid.innerHTML = '';
+  if (programs.length === 0) { grid.innerHTML = '<p class="empty-note">No programs yet. Start one above.</p>'; return; }
+  programs.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'program-card';
+    card.innerHTML = `
+      <div>
+        <div class="program-name">${p.name}</div>
+        <div class="program-meta">Created ${new Date(p.created_at).toLocaleDateString()}</div>
+      </div>
+      <span class="program-arrow">&rarr;</span>
+    `;
+    card.addEventListener('click', () => openProgram(p.id));
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('new-program-btn').addEventListener('click', () => {
+  document.getElementById('new-program-name').value = '';
+  document.getElementById('new-program-subsectors').value = '';
+  document.getElementById('new-program-keywords').value = '';
+  document.getElementById('new-program-profile').value = '';
+  document.getElementById('new-program-error').textContent = '';
+  showScoreSubview('new');
+});
+document.getElementById('new-program-back').addEventListener('click', () => showScoreSubview('home'));
+
+document.getElementById('new-program-save').addEventListener('click', async () => {
+  const name = document.getElementById('new-program-name').value.trim();
+  const subsectors = parseSubsectorList(document.getElementById('new-program-subsectors').value);
+  const keywords = parseTermList(document.getElementById('new-program-keywords').value);
+  const profile = parseTermList(document.getElementById('new-program-profile').value);
+  const errorEl = document.getElementById('new-program-error');
+  if (!name) { errorEl.textContent = 'Enter a program name.'; return; }
+  if (subsectors.length === 0 && keywords.length === 0 && profile.length === 0) { errorEl.textContent = 'Enter at least one term in one of the categories.'; return; }
+  await insertProgram({ name, subsectors, keywords, profile });
+  await renderProgramGrid();
+  showScoreSubview('home');
+});
+
+// ---- Program view ----
+async function openProgram(programId) {
+  currentProgramId = programId;
+  const programs = await fetchPrograms();
+  const program = programs.find(p => p.id === programId);
+  if (!program) { showScoreSubview('home'); return; }
+  document.getElementById('program-title').textContent = program.name;
+  renderSubsectorChips(document.getElementById('view-subsectors'), program.subsectors);
+  renderSimpleChips(document.getElementById('view-keywords'), program.keywords);
+  renderSimpleChips(document.getElementById('view-profile'), program.profile);
+  document.getElementById('program-view-mode').style.display = '';
+  document.getElementById('program-edit-mode').style.display = 'none';
+  document.getElementById('score-venture-name').value = '';
+  document.getElementById('score-venture-text').value = '';
+  document.getElementById('score-results').innerHTML = '';
+  document.getElementById('score-error').textContent = '';
+  lastScoreResult = null;
+  showScoreSubview('program');
+  await renderCompareList(programId);
+}
+
+document.getElementById('program-back').addEventListener('click', async () => {
+  currentProgramId = null;
+  await renderProgramGrid();
+  showScoreSubview('home');
+});
+
+document.getElementById('program-edit-btn').addEventListener('click', async () => {
+  const programs = await fetchPrograms();
+  const program = programs.find(p => p.id === currentProgramId);
+  if (!program) return;
+  document.getElementById('edit-program-name').value = program.name;
+  document.getElementById('edit-program-subsectors').value = program.subsectors.map(s => s.description ? `${s.name}: ${s.description}` : s.name).join('\n');
+  document.getElementById('edit-program-keywords').value = program.keywords.join('\n');
+  document.getElementById('edit-program-profile').value = program.profile.join('\n');
+  document.getElementById('edit-program-error').textContent = '';
+  document.getElementById('program-view-mode').style.display = 'none';
+  document.getElementById('program-edit-mode').style.display = '';
+});
+document.getElementById('edit-program-cancel').addEventListener('click', () => {
+  document.getElementById('program-view-mode').style.display = '';
+  document.getElementById('program-edit-mode').style.display = 'none';
+});
+document.getElementById('edit-program-save').addEventListener('click', async () => {
+  const name = document.getElementById('edit-program-name').value.trim();
+  const subsectors = parseSubsectorList(document.getElementById('edit-program-subsectors').value);
+  const keywords = parseTermList(document.getElementById('edit-program-keywords').value);
+  const profile = parseTermList(document.getElementById('edit-program-profile').value);
+  const errorEl = document.getElementById('edit-program-error');
+  if (!name) { errorEl.textContent = 'Enter a program name.'; return; }
+  if (subsectors.length === 0 && keywords.length === 0 && profile.length === 0) { errorEl.textContent = 'Enter at least one term in one of the categories.'; return; }
+  await updateProgramRow(currentProgramId, { name, subsectors, keywords, profile });
+  await openProgram(currentProgramId);
+});
+document.getElementById('edit-program-delete').addEventListener('click', async () => {
+  await deleteProgramRow(currentProgramId);
+  currentProgramId = null;
+  await renderProgramGrid();
+  showScoreSubview('home');
+});
+
+// ---- Keyword scoring ----
+function scoreAgainstCriteria(program, ventureText) {
+  const lowerText = ventureText.toLowerCase();
+  const breakdown = [];
+  if (program.subsectors.length > 0) {
+    const subsectorResults = program.subsectors.map(s => {
+      const nameHit = lowerText.includes(s.name.toLowerCase());
+      const descHits = s.descriptionWords.filter(w => lowerText.includes(w));
+      const descMisses = s.descriptionWords.filter(w => !lowerText.includes(w));
+      const descFraction = s.descriptionWords.length > 0 ? descHits.length / s.descriptionWords.length : 0;
+      const fraction = nameHit ? 1 : descFraction;
+      return { name: s.name, nameHit, descHits, descMisses, fraction };
+    });
+    const catFraction = subsectorResults.reduce((sum, s) => sum + s.fraction, 0) / subsectorResults.length;
+    breakdown.push({ type: 'subsectors', title: 'Subsectors', fraction: catFraction, subsectorResults });
+  }
+  [{ key: 'keywords', title: 'Additional keywords' }, { key: 'profile', title: 'Customer profile' }].forEach(cat => {
+    const terms = program[cat.key];
+    if (terms.length === 0) return;
+    const hits = terms.filter(t => lowerText.includes(t.toLowerCase()));
+    const misses = terms.filter(t => !lowerText.includes(t.toLowerCase()));
+    breakdown.push({ type: 'flat', title: cat.title, fraction: hits.length / terms.length, hits, misses });
+  });
+  const avgFraction = breakdown.length > 0 ? breakdown.reduce((sum, b) => sum + b.fraction, 0) / breakdown.length : 0;
+  const score = Math.min(5, Math.max(1, 1 + Math.round(avgFraction * 4)));
+  const summary = `Averaged ${Math.round(avgFraction * 100)}% match across ${breakdown.length} categor${breakdown.length === 1 ? 'y' : 'ies'}.`;
+  return { score, summary, breakdown };
+}
+
+function renderScoreResults(data) {
+  const resultsEl = document.getElementById('score-results');
+  resultsEl.innerHTML = '';
+  const tagCls = scoreTagClass(data.score);
+  const card = document.createElement('div');
+  card.className = 'card';
+  let breakdownHTML = data.breakdown.map(b => {
+    if (b.type === 'subsectors') {
+      const subHTML = b.subsectorResults.map(s => `
+        <div class="subsector-block">
+          <div class="subsector-name-row"><span class="term-chip ${s.nameHit ? 'name-hit' : 'name-miss'}">${s.name}</span></div>
+          ${s.descHits.length + s.descMisses.length > 0 ? `<div>${s.descHits.map(w => `<span class="term-chip hit">${w}</span>`).join('')}${s.descMisses.map(w => `<span class="term-chip miss">${w}</span>`).join('')}</div>` : ''}
+        </div>
+      `).join('');
+      return `<div class="breakdown-item"><div class="breakdown-title">${b.title} — ${Math.round(b.fraction * 100)}% avg match</div>${subHTML}</div>`;
+    } else {
+      const chips = b.hits.map(t => `<span class="term-chip hit">${t}</span>`).join('') + b.misses.map(t => `<span class="term-chip miss">${t}</span>`).join('');
+      return `<div class="breakdown-item"><div class="breakdown-title">${b.title} — ${b.hits.length}/${b.hits.length + b.misses.length} matched</div><div>${chips}</div></div>`;
+    }
+  }).join('');
+  card.innerHTML = `
+    <div class="score-head">
+      <div class="score-left"><span class="score-number">${data.score}</span><span class="score-out-of">/ 5</span></div>
+      <span class="score-tag ${tagCls}">${scoreTagLabel(data.score)}</span>
+    </div>
+    <div class="rationale" style="margin-bottom: 10px;">${data.summary}</div>
+    ${breakdownHTML}
+  `;
+  resultsEl.appendChild(card);
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save to comparison list';
+  saveBtn.id = 'score-save';
+  resultsEl.appendChild(saveBtn);
+  saveBtn.addEventListener('click', saveCurrentScore);
+}
+
+document.getElementById('score-run').addEventListener('click', async () => {
+  const ventureText = document.getElementById('score-venture-text').value.trim();
+  const errorEl = document.getElementById('score-error');
+  errorEl.textContent = '';
+  if (!ventureText) { errorEl.textContent = 'Paste the venture application text.'; return; }
+  const programs = await fetchPrograms();
+  const program = programs.find(p => p.id === currentProgramId);
+  if (!program) { errorEl.textContent = 'Program not found.'; return; }
+  const parsed = scoreAgainstCriteria(program, ventureText);
+  lastScoreResult = parsed;
+  renderScoreResults(parsed);
+});
+
+async function saveCurrentScore() {
+  const nameInput = document.getElementById('score-venture-name');
+  const name = nameInput.value.trim();
+  const errorEl = document.getElementById('score-error');
+  if (!name) { errorEl.textContent = 'Enter a venture name before saving.'; return; }
+  if (!lastScoreResult) return;
+  await upsertEntry(currentProgramId, name, lastScoreResult.score, lastScoreResult.summary);
+  await renderCompareList(currentProgramId);
+  const saveBtn = document.getElementById('score-save');
+  if (saveBtn) { saveBtn.textContent = 'Saved'; saveBtn.disabled = true; }
+}
+
+async function renderCompareList(programId) {
+  const container = document.getElementById('compare-list');
+  const entries = await fetchEntries(programId);
+  if (entries.length === 0) { container.innerHTML = '<p class="empty-note">No scored ventures yet for this program.</p>'; return; }
+  container.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'compare-row';
+    row.innerHTML = `
+      <div class="compare-left">
+        <span class="compare-score">${entry.score}/5</span>
+        <div><div class="compare-name">${entry.venture_name}</div><div class="compare-summary">${entry.summary}</div></div>
+      </div>
+      <button class="compare-delete secondary" data-id="${entry.id}">Remove</button>
+    `;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('.compare-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await deleteEntry(btn.dataset.id);
+      await renderCompareList(programId);
+    });
+  });
+}
+
+// ---- Init ----
+renderProgramGrid();
+showScoreSubview('home');
+</script>
+
+</body>
+</html>
