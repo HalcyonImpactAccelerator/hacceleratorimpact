@@ -207,6 +207,11 @@
   .program-card.band-none { border-left-color: var(--line-strong); }
   .program-name { font-size: 16px; font-weight: 700; font-family: 'Fraunces', serif; }
   .program-meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+  .mini-dist { display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-top: 8px; }
+  .mini-bar { width: 7px; border-radius: 3px 3px 1px 1px; min-height: 3px; }
+  .mini-bar.b1, .mini-bar.b2 { background: var(--rust); }
+  .mini-bar.b3 { background: var(--gold); }
+  .mini-bar.b4, .mini-bar.b5 { background: var(--leaf); }
   .program-arrow { color: var(--ink-soft); font-size: 16px; }
   .back-link { font-size: 13px; color: var(--ink-soft); cursor: pointer; margin-bottom: 8px; display: inline-block; font-weight: 600; }
   .back-link:hover { color: var(--ink); }
@@ -461,12 +466,20 @@ async function renderProgramGrid() {
     const metaText = programEntries.length === 0
       ? 'No ventures scored yet'
       : `${programEntries.length} venture${programEntries.length === 1 ? '' : 's'} scored · avg ${avg.toFixed(1)}`;
+    const counts = [1,2,3,4,5].map(n => programEntries.filter(e => e.score === n).length);
+    const maxCount = Math.max(...counts, 1);
+    const distHTML = programEntries.length === 0 ? '' : `
+      <div class="mini-dist">
+        ${counts.map((c, i) => `<div class="mini-bar b${i + 1}" style="height:${Math.max(3, Math.round((c / maxCount) * 26))}px" title="${i + 1}: ${c}"></div>`).join('')}
+      </div>
+    `;
     const card = document.createElement('div');
     card.className = `program-card band-${band}`;
     card.innerHTML = `
       <div>
         <div class="program-name">${p.name}</div>
         <div class="program-meta">${metaText}</div>
+        ${distHTML}
       </div>
       <span class="program-arrow">&rarr;</span>
     `;
