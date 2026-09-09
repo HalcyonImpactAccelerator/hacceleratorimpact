@@ -168,10 +168,16 @@ function extractDescriptionWords(desc) {
 }
 function parseSubsectorList(raw) {
   return raw.split('\n').map(l => l.trim()).filter(l => l.length > 0).map(line => {
-    const match = line.match(/^(.+?)[:\-–—](.*)$/);
-    if (match) {
-      const name = match[1].trim();
-      const description = match[2].trim();
+    const colonIndex = line.indexOf(':');
+    if (colonIndex !== -1) {
+      const name = line.slice(0, colonIndex).trim();
+      const description = line.slice(colonIndex + 1).trim();
+      return { name, description, descriptionWords: extractDescriptionWords(description) };
+    }
+    const dashMatch = line.match(/^(.+?)\s[-–—]\s(.*)$/);
+    if (dashMatch) {
+      const name = dashMatch[1].trim();
+      const description = dashMatch[2].trim();
       return { name, description, descriptionWords: extractDescriptionWords(description) };
     }
     return { name: line, description: '', descriptionWords: [] };
